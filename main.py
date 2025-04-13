@@ -1,23 +1,30 @@
 import json
-import os
 import asyncio
-import nest_asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
-from pytz import timezone
-from apscheduler.schedulers.background import BackgroundScheduler
-
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CallbackContext, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CallbackContext,
+    MessageHandler,
+    filters,
+)
+from telegram.ext.filters import User
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
+import os
+import nest_asyncio
+
+nest_asyncio.apply()
 
 # Настройки
 DATA_FILE = "lunch_data.json"
-TIMEZONE = timezone("Asia/Nicosia")
-USER_ID = 344657888  # Замени на свой Telegram ID
+USER_ID = 344657888
+TIMEZONE = pytz.timezone("Asia/Nicosia")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Flask для UptimeRobot
+# Flask для пинга
 app = Flask("")
 
 @app.route("/")
@@ -30,7 +37,7 @@ def run_flask():
 def keep_alive():
     Thread(target=run_flask).start()
 
-# Хранилище данных
+# Работа с данными
 def load_data():
     try:
         with open(DATA_FILE, "r") as f:
@@ -67,30 +74,25 @@ async def send_weekly_stats(app):
         if data.get(day) == "Да":
             count_yes += 1
 
-    if count_yes == 0:
-        text = "Ты не должен ощущать чувства вины (нет)"
-    elif count_yes == 1:
-        text = "Ну ничего, ты старался!"
-    elif count_yes == 2:
-        text = "Неплохо!"
-    elif count_yes == 3:
-        text = "Красавчик, целых три обеда на этой неделе!"
-    elif count_yes == 4:
-        text = "Вау! Ты супер!"
-    elif count_yes == 5:
-        text = "Всю рабочую неделю обедал? Невероятно!"
-    elif count_yes == 6:
-        text = "Ты просто лучший, почти всю неделю обедал!"
-    else:
-        text = "Амбиливбл! Вин стрик!"
+    messages = {
+        0: "Ты не должен ощущать чувства вины (нет)",
+        1: "Ну ничего, ты старался!",
+        2: "Неплохо!",
+        3: "Красавчик, целых три обеда на этой неделе!",
+        4: "Вау! Ты супер!",
+        5: "Всю рабочую неделю обедал? Невероятно!",
+        6: "Ты просто лучший, почти всю неделю обедал!",
+        7: "Амбиливбл! Вин стрик!"
+    }
 
+    text = messages.get(count_yes, "Неделя прошла, но данных нет.")
     await app.bot.send_message(chat_id=USER_ID, text=f"📊 Обеденная статистика: {count_yes}/7\n{text}")
 
-# Основной запуск
+# Запуск бота
 async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    application.add_handler(MessageHandler(filters.TEXT & filters.USER(user_id=USER_ID), handle_response))
+    application.add_handler(MessageHandler(filters.TEXT & User(user_id=USER_ID), handle_response))
 
     scheduler = BackgroundScheduler(timezone=TIMEZONE)
     scheduler.add_job(lambda: application.create_task(ask_lunch(application)), "cron", hour=14, minute=0)
@@ -101,5 +103,4 @@ async def main():
     await application.run_polling()
 
 if __name__ == "__main__":
-    nest_asyncio.apply()
     asyncio.run(main())
