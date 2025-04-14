@@ -90,7 +90,11 @@ async def main():
     scheduler.start()
 
     logging.info("✅ LunchBot готов. Старт polling...")
-    await application.run_polling()
+
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.updater.wait_until_closed()
 
 if __name__ == "__main__":
     import nest_asyncio
