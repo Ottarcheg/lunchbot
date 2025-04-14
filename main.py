@@ -22,43 +22,55 @@ scheduler = BackgroundScheduler()
 
 def load_data():
     try:
+        logging.info("📂 Загружаю данные из файла...")
         with open(DATA_FILE, "r") as f:
             return json.load(f)
     except FileNotFoundError:
-        logging.warning("Файл данных не найден, создаю новый.")
+        logging.warning("⚠️ Файл данных не найден, создаю новый.")
         return {}
 
 def save_data(data):
+    logging.info("💾 Сохраняю данные в файл...")
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
 async def ask_lunch(application):
     now = datetime.now().strftime('%H:%M:%S')
     logging.info(f"⏰ Время задать вопрос. Сейчас {now}")
-    await application.bot.send_message(
-        chat_id=CHAT_ID,
-        text="Ты пообедал сегодня?",
-        reply_markup={
-            "keyboard": [["Да"], ["Нет"]],
-            "resize_keyboard": True,
-            "one_time_keyboard": True,
-        }
-    )
+    try:
+        await application.bot.send_message(
+            chat_id=CHAT_ID,
+            text="Ты пообедал сегодня?",
+            reply_markup={
+                "keyboard": [["Да"], ["Нет"]],
+                "resize_keyboard": True,
+                "one_time_keyboard": True,
+            }
+        )
+        logging.info("📨 Вопрос отправлен успешно.")
+    except Exception as e:
+        logging.exception(f"Ошибка при отправке вопроса: {e}")
 
 async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("📩 Получен ответ от пользователя.")
     user_response = update.message.text.lower()
     data = load_data()
     today = datetime.now().strftime('%Y-%m-%d')
+
     if today not in data:
         data[today] = []
+
     if user_response in ["да", "нет"]:
         data[today].append(user_response)
         save_data(data)
         await update.message.reply_text("Ответ сохранён ✅")
+        logging.info(f"✅ Ответ '{user_response}' сохранён.")
     else:
         await update.message.reply_text("Пожалуйста, ответь 'Да' или 'Нет'.")
+        logging.info("⚠️ Неверный ответ от пользователя.")
 
 async def send_weekly_summary(application):
+    logging.info("📊 Генерация еженедельной статистики...")
     data = load_data()
     count = sum(day.count("да") for day in data.values())
     messages = {
@@ -75,22 +87,29 @@ async def send_weekly_summary(application):
         "📊 Обеденная статистика за неделю:\n" +
         messages.get(count, "Что-то пошло не так...")
     )
-    await application.bot.send_message(chat_id=CHAT_ID, text=message)
+    try:
+        await application.bot.send_message(chat_id=CHAT_ID, text=message)
+        logging.info("📤 Статистика отправлена.")
+    except Exception as e:
+        logging.exception(f"Ошибка при отправке статистики: {e}")
 
 @app.route("/")
 def home():
+    logging.info("🌍 Получен HTTP GET запрос на /")
     return "LunchBot is running"
 
 async def main():
+    logging.info("🚀 Инициализация Telegram Application...")
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
 
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=13, minute=30)
+    logging.info("📅 Планирую задачи...")
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=13, minute=40)
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
     scheduler.start()
+    logging.info("✅ Планировщик запущен")
 
-    logging.info("✅ LunchBot готов. Старт polling...")
-
+    logging.info("📡 LunchBot готов. Старт polling...")
     await application.run_polling()
 
 if __name__ == "__main__":
@@ -98,4 +117,5 @@ if __name__ == "__main__":
     nest_asyncio.apply()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    logging.info("🔁 Запуск event loop...")
     loop.run_until_complete(main())
