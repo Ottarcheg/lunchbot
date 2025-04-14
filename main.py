@@ -72,27 +72,16 @@ async def main():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=CHAT_ID), handle_message))
 
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=13, minute=0, timezone="Europe/Nicosia"))
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=13, minute=10, timezone="Europe/Nicosia"))
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), CronTrigger(day_of_week="sun", hour=19, minute=0, timezone="Europe/Nicosia"))
     scheduler.start()
 
     logging.info("✅ LunchBot готов. Старт polling...")
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
-    logging.info("📡 Polling запущен")
+    await application.run_polling()
 
 def run_flask():
     app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(main())
-
-    try:
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    asyncio.run(main())
