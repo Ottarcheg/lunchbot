@@ -100,6 +100,7 @@ def home():
 
 async def main():
     logging.info("🚀 Инициализация Telegram Application...")
+    logging.info(f"🕒 Время сервера: {datetime.now()}")
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
 
