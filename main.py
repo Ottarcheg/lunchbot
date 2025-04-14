@@ -4,11 +4,9 @@ import logging
 from datetime import datetime
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
-from telegram import Bot
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, filters
+    ApplicationBuilder, MessageHandler, filters, ContextTypes
 )
-import nest_asyncio
 
 TOKEN = "7701441306:AAF5Dd4VcXSilKIw9mAfPMmWQrzvAiWB69I"
 CHAT_ID = 344657888
@@ -47,7 +45,7 @@ async def ask_lunch(application):
         }
     )
 
-async def handle_response(update, context):
+async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
     user_response = update.message.text.lower()
     data = load_data()
     today = datetime.now().strftime('%Y-%m-%d')
@@ -60,7 +58,7 @@ async def handle_response(update, context):
     else:
         await update.message.reply_text("Пожалуйста, ответь 'Да' или 'Нет'.")
 
-async def send_weekly_summary(app):
+async def send_weekly_summary(application):
     data = load_data()
     count = sum(day.count("да") for day in data.values())
     messages = {
@@ -77,7 +75,7 @@ async def send_weekly_summary(app):
         "📊 Обеденная статистика за неделю:\n" +
         messages.get(count, "Что-то пошло не так...")
     )
-    await app.bot.send_message(chat_id=CHAT_ID, text=message)
+    await application.bot.send_message(chat_id=CHAT_ID, text=message)
 
 @app.route("/")
 def home():
@@ -85,21 +83,19 @@ def home():
 
 async def main():
     application = ApplicationBuilder().token(TOKEN).build()
-
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
 
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=13, minute=20)
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=13, minute=30)
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
     scheduler.start()
 
     logging.info("✅ LunchBot готов. Старт polling...")
-    await application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.updater.wait_until_closed()
 
 if __name__ == "__main__":
     import nest_asyncio
-    import asyncio
-
     nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())
