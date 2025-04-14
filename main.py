@@ -1,3 +1,4 @@
+
 import asyncio
 import logging
 import json
@@ -8,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask
 import nest_asyncio
+import threading
 
 nest_asyncio.apply()
 
@@ -72,12 +74,17 @@ async def main():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=CHAT_ID), handle_message))
 
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=12, minute=20, timezone="Europe/Nicosia"))
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=12, minute=30, timezone="Europe/Nicosia"))
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), CronTrigger(day_of_week="sun", hour=19, minute=0, timezone="Europe/Nicosia"))
     scheduler.start()
 
     logging.info("✅ LunchBot готов. Старт polling...")
     await application.run_polling()
 
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
+
 if __name__ == "__main__":
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
     asyncio.run(main())
