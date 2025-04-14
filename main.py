@@ -59,11 +59,7 @@ async def send_weekly_summary(application: Application):
         6: "Ты просто лучший, почти всю неделю обедал!",
         7: "Амбиливбл! Вин стрик!",
     }
-    message = (
-        "📊 Обеденная статистика за неделю:
-" +
-        messages.get(count, "Что-то пошло не так...")
-    )
+    message = f"📊 Обеденная статистика за неделю:\n{messages.get(count, 'Что-то пошло не так...')}"
     await application.bot.send_message(chat_id=CHAT_ID, text=message)
     save_data({})
 
@@ -76,7 +72,7 @@ async def main():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=CHAT_ID), handle_message))
 
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=12, minute=30, timezone="Europe/Nicosia"))
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=12, minute=40, timezone="Europe/Nicosia"))
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), CronTrigger(day_of_week="sun", hour=19, minute=0, timezone="Europe/Nicosia"))
     scheduler.start()
 
