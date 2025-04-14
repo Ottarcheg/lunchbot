@@ -9,6 +9,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filte
 from telegram.ext.filters import User
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
+import httpx
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,6 +20,7 @@ TOKEN = "7701441306:AAF5Dd4VcXSilKIw9mAfPMmWQrzvAiWB69I"
 USER_ID = 344657888
 DATA_FILE = "lunch_data.json"
 TIMEZONE = pytz.timezone("Asia/Nicosia")
+APP_URL = "https://lunchbot-production.up.railway.app"
 
 app = Flask(__name__)
 
@@ -81,6 +83,14 @@ async def send_weekly_stats(app):
     summary = messages.get(count_yes, "Неделя прошла, но данных нет.")
     await app.bot.send_message(chat_id=USER_ID, text=f"📊 Обеденная статистика: {count_yes}/7\n{summary}")
 
+async def ping_self():
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(APP_URL)
+            logging.info(f"🔄 Self-ping OK: {r.status_code}")
+    except Exception as e:
+        logging.warning(f"❌ Self-ping failed: {e}")
+
 async def main():
     logging.info("🔁 Инициализация LunchBot...")
     application = ApplicationBuilder().token(TOKEN).build()
@@ -89,6 +99,7 @@ async def main():
     scheduler = BackgroundScheduler(timezone=TIMEZONE)
     scheduler.add_job(lambda: application.create_task(ask_lunch(application)), "cron", hour=14, minute=0)
     scheduler.add_job(lambda: application.create_task(send_weekly_stats(application)), "cron", day_of_week="sun", hour=19, minute=0)
+    scheduler.add_job(lambda: application.create_task(ping_self()), "interval", minutes=4)
     scheduler.start()
 
     keep_alive()
