@@ -113,7 +113,7 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
 
     logging.info("📅 Планирую задачи...")
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=14, minute=0)
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=15, minute=50)
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
