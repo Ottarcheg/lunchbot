@@ -114,8 +114,8 @@ async def main():
 
 if __name__ == "__main__":
     import nest_asyncio
+    import asyncio
+
     nest_asyncio.apply()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    logging.info("🔁 Запуск event loop...")
-    loop.run_until_complete(main())
+    logging.info("🔁 Запуск LunchBot через asyncio.run...")
+    asyncio.run(main())
