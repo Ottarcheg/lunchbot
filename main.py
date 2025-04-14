@@ -4,21 +4,27 @@ import logging
 from datetime import datetime
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.base import JobLookupError
 from telegram.ext import (
     ApplicationBuilder, MessageHandler, filters, ContextTypes
 )
+from pytz import timezone
 
+# === НАСТРОЙКИ ===
 TOKEN = "7701441306:AAF5Dd4VcXSilKIw9mAfPMmWQrzvAiWB69I"
 CHAT_ID = 344657888
 DATA_FILE = "lunch_data.json"
+CYPRUS_TZ = timezone("Europe/Nicosia")
 
+# === ЛОГИ ===
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
+# === ИНИЦИАЛИЗАЦИЯ ===
 app = Flask(__name__)
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler(timezone=CYPRUS_TZ)
 
 def load_data():
     try:
@@ -35,7 +41,7 @@ def save_data(data):
         json.dump(data, f)
 
 async def ask_lunch(application):
-    now = datetime.now().strftime('%H:%M:%S')
+    now = datetime.now(CYPRUS_TZ).strftime('%H:%M:%S')
     logging.info(f"⏰ Время задать вопрос. Сейчас {now}")
     try:
         await application.bot.send_message(
@@ -55,7 +61,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("📩 Получен ответ от пользователя.")
     user_response = update.message.text.lower()
     data = load_data()
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now(CYPRUS_TZ).strftime('%Y-%m-%d')
 
     if today not in data:
         data[today] = []
@@ -100,12 +106,14 @@ def home():
 
 async def main():
     logging.info("🚀 Инициализация Telegram Application...")
-    logging.info(f"🕒 Время сервера: {datetime.now()}")
+    logging.info(f"🕒 Время сервера (UTC): {datetime.utcnow()}")
+    logging.info(f"🕒 Время Кипра: {datetime.now(CYPRUS_TZ)}")
+
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
 
     logging.info("📅 Планирую задачи...")
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=14, minute=00)
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=14, minute=0)
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
@@ -115,8 +123,6 @@ async def main():
 
 if __name__ == "__main__":
     import nest_asyncio
-    import asyncio
-
     nest_asyncio.apply()
     logging.info("🔁 Запуск LunchBot через asyncio.run...")
     asyncio.run(main())
