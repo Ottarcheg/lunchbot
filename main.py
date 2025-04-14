@@ -92,15 +92,18 @@ async def ping_self():
     except Exception as e:
         logging.warning(f"❌ Self-ping failed: {e}")
 
+async def run_ping(app):
+    await ping_self()
+
 async def main():
     logging.info("🔁 Инициализация LunchBot...")
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & User(user_id=USER_ID), handle_response))
 
     scheduler = BackgroundScheduler(timezone=TIMEZONE)
-    scheduler.add_job(lambda: application.create_task(ask_lunch(application)), "cron", hour=10, minute=5)  # тест 10:05
+    scheduler.add_job(lambda: application.create_task(ask_lunch(application)), "cron", hour=11, minute=40)
     scheduler.add_job(lambda: application.create_task(send_weekly_stats(application)), "cron", day_of_week="sun", hour=19, minute=0)
-    scheduler.add_job(lambda: application.create_task(ping_self()), "interval", minutes=4)
+    scheduler.add_job(lambda: application.create_task(run_ping(application)), "interval", minutes=4)
     scheduler.start()
 
     keep_alive()
