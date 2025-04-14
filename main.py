@@ -1,79 +1,73 @@
 import json
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder,
-    CallbackContext,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from telegram.ext.filters import User
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
-import os
-import nest_asyncio
 
-nest_asyncio.apply()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
 
-# Настройки
-DATA_FILE = "lunch_data.json"
+TOKEN = "7701441306:AAF5Dd4VcXSilKIw9mAfPMmWQrzvAiWB69I"
 USER_ID = 344657888
+DATA_FILE = "lunch_data.json"
 TIMEZONE = pytz.timezone("Asia/Nicosia")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Flask для пинга
-app = Flask("")
+app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "LunchBot is alive!", 200
+    logging.info("📡 Пинг получен на /")
+    return "LunchBot is alive", 200
 
 def run_flask():
+    logging.info("🌐 Flask сервер запускается...")
     app.run(host="0.0.0.0", port=8080)
 
 def keep_alive():
     Thread(target=run_flask).start()
 
-# Работа с данными
 def load_data():
     try:
         with open(DATA_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except Exception as e:
+        logging.warning(f"Не удалось загрузить данные: {e}")
         return {}
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
-# Обработка ответов
-async def handle_response(update: Update, context: CallbackContext):
-    user_response = update.message.text
+async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(f"📩 Получен ответ: {update.message.text}")
+    text = update.message.text
     today = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
     data = load_data()
-    data[today] = user_response
+    data[today] = text
     save_data(data)
     await update.message.reply_text("Ответ записан. Спасибо!")
 
-# Вопрос об обеде
 async def ask_lunch(app):
+    logging.info("📤 Отправка вопроса об обеде...")
     keyboard = ReplyKeyboardMarkup([["Да", "Нет"]], one_time_keyboard=True, resize_keyboard=True)
     await app.bot.send_message(chat_id=USER_ID, text="Ты пообедал сегодня?", reply_markup=keyboard)
 
-# Еженедельная статистика
 async def send_weekly_stats(app):
+    logging.info("📊 Подведение недельной статистики...")
     data = load_data()
     today = datetime.now(TIMEZONE)
-    count_yes = 0
-
-    for i in range(7):
-        day = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-        if data.get(day) == "Да":
-            count_yes += 1
-
+    count_yes = sum(
+        1 for i in range(7)
+        if data.get((today - timedelta(days=i)).strftime("%Y-%m-%d")) == "Да"
+    )
     messages = {
         0: "Ты не должен ощущать чувства вины (нет)",
         1: "Ну ничего, ты старался!",
@@ -84,14 +78,12 @@ async def send_weekly_stats(app):
         6: "Ты просто лучший, почти всю неделю обедал!",
         7: "Амбиливбл! Вин стрик!"
     }
+    summary = messages.get(count_yes, "Неделя прошла, но данных нет.")
+    await app.bot.send_message(chat_id=USER_ID, text=f"📊 Обеденная статистика: {count_yes}/7\n{summary}")
 
-    text = messages.get(count_yes, "Неделя прошла, но данных нет.")
-    await app.bot.send_message(chat_id=USER_ID, text=f"📊 Обеденная статистика: {count_yes}/7\n{text}")
-
-# Запуск бота
 async def main():
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-
+    logging.info("🔁 Инициализация LunchBot...")
+    application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & User(user_id=USER_ID), handle_response))
 
     scheduler = BackgroundScheduler(timezone=TIMEZONE)
@@ -100,6 +92,8 @@ async def main():
     scheduler.start()
 
     keep_alive()
+    await asyncio.sleep(2)
+    logging.info("✅ LunchBot готов. Старт polling...")
     await application.run_polling()
 
 if __name__ == "__main__":
