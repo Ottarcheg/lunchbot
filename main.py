@@ -4,108 +4,93 @@ import json
 import logging
 from datetime import datetime
 from pytz import timezone
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from apscheduler.schedulers.background import BackgroundScheduler
-import nest_asyncio
 from flask import Flask
-from threading import Thread
+import nest_asyncio
 
-# Настройки
+nest_asyncio.apply()
+
 TOKEN = "7701441306:AAF5Dd4VcXSilKIw9mAfPMmWQrzvAiWB69I"
-CHAT_ID = 570026464
+CHAT_ID = "770144130"  # Заменить на твой chat_id
 DATA_FILE = "lunch_data.json"
-TIMEZONE = timezone("Europe/Nicosia")
 
-# Логирование
-logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    level=logging.INFO,
-)
-
-# Flask сервер
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 app = Flask(__name__)
+scheduler = BackgroundScheduler(timezone="Europe/Nicosia")
 
-@app.route("/")
-def home():
-    return "LunchBot is running!"
-
-def run_flask():
-    app.run(host="0.0.0.0", port=8080)
-
-# Загрузка данных
 def load_data():
     try:
         with open(DATA_FILE, "r") as f:
             return json.load(f)
-    except Exception as e:
-        logging.warning(f"Не удалось загрузить данные: {e}")
+    except FileNotFoundError:
+        logging.warning("Файл с данными не найден, создаём новый.")
         return {}
 
-# Сохранение данных
 def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
-# Отправка вопроса об обеде
 async def ask_lunch(app: Application):
-    logging.info("📨 Отправка вопроса о ланче")
-    now = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
-    data = load_data()
-    data[now] = data.get(now, {})
-    markup = ReplyKeyboardMarkup([["Да", "Нет"]], one_time_keyboard=True, resize_keyboard=True)
-    await app.bot.send_message(chat_id=CHAT_ID, text="Ты пообедал сегодня?", reply_markup=markup)
-    save_data(data)
+    logging.info("Отправка вопроса о ланче...")
+    keyboard = [[
+        InlineKeyboardButton("Да", callback_data="yes"),
+        InlineKeyboardButton("Нет", callback_data="no"),
+    ]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await app.bot.send_message(chat_id=CHAT_ID, text="Ты пообедал сегодня?", reply_markup=reply_markup)
 
-# Обработка ответа
 async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id != CHAT_ID:
-        return
-
-    response = update.message.text.strip()
-    today = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
+    user_response = update.callback_query.data
+    user_id = str(update.callback_query.from_user.id)
     data = load_data()
-    data[today] = {"response": response}
+    today = str(datetime.now(timezone("Europe/Nicosia")).date())
+    data[today] = user_response
     save_data(data)
-    await context.bot.send_message(chat_id=CHAT_ID, text="Ответ записан!")
+    await update.callback_query.answer("Ответ сохранён.")
 
-# Подведение итогов недели
-async def weekly_summary(app: Application):
-    logging.info("📊 Подведение итогов недели")
+async def send_summary(app: Application):
+    logging.info("Формируем недельную статистику...")
     data = load_data()
-    count = sum(1 for day in data.values() if day.get("response") == "Да")
-    messages = {
-        0: "Ты не должен ощущать чувства вины (нет)",
-        1: "Ну ничего, ты старался!",
-        2: "Неплохо!",
-        3: "Красавчик, целых три обеда на этой неделе!",
-        4: "Вау! Ты супер!",
-        5: "Всю рабочую неделю обедал? Невероятно!",
-        6: "Ты просто лучший, почти всю неделю обедал!",
-        7: "Амбиливбл! Вин стрик!",
-    }
-    summary = messages.get(count, f"Ты пообедал {count} раз(а) на этой неделе.")
-    await app.bot.send_message(chat_id=CHAT_ID, text=f"📊 Обеденная статистика за неделю:
-{summary}")
-    save_data({})  # Сброс данных
+    yes_count = list(data.values()).count("yes")
+    if yes_count == 0:
+        summary = "Ты не должен ощущать чувства вины (нет)"
+    elif yes_count == 1:
+        summary = "Ну ничего, ты старался!"
+    elif yes_count == 2:
+        summary = "Неплохо!"
+    elif yes_count == 3:
+        summary = "Красавчик, целых три обеда на этой неделе!"
+    elif yes_count == 4:
+        summary = "Вау! Ты супер!"
+    elif yes_count == 5:
+        summary = "Всю рабочую неделю обедал? Невероятно!"
+    elif yes_count == 6:
+        summary = "Ты просто лучший, почти всю неделю обедал!"
+    else:
+        summary = "Амбиливбл! Вин стрик!"
+    await app.bot.send_message(
+        chat_id=CHAT_ID,
+        text=(
+            f"📊 Обеденная статистика за неделю:
+"
+            f"— Да: {yes_count} раз(а)
+"
+            f"{summary}"
+        )
+    )
 
-# Запуск
 async def main():
-    logging.info("🔁 Инициализация LunchBot...")
     application = Application.builder().token(TOKEN).build()
+    application.add_handler(CallbackQueryHandler(handle_response))
 
-    application.add_handler(MessageHandler(filters.TEXT, handle_response))
-
-    scheduler = BackgroundScheduler(timezone=TIMEZONE)
-    scheduler.add_job(lambda: application.create_task(ask_lunch(application)), "cron", hour=12, minute=0)
-    scheduler.add_job(lambda: application.create_task(weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=12, minute=6)
+    scheduler.add_job(lambda: asyncio.create_task(send_summary(application)), "cron", day_of_week="sun", hour=19)
     scheduler.start()
 
-    Thread(target=run_flask).start()
-    logging.info("✅ LunchBot готов. Старт polling...")
+    logging.info("✅ LunchBot готов к работе.")
     await application.run_polling()
 
 if __name__ == "__main__":
-    nest_asyncio.apply()
     asyncio.run(main())
