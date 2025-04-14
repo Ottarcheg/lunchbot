@@ -60,8 +60,7 @@ async def send_weekly_summary(application: Application):
         7: "Амбиливбл! Вин стрик!",
     }
     message = (
-        "📊 Обеденная статистика за неделю:
-" +
+        "📊 Обеденная статистика за неделю:\n" +
         messages.get(count, "Что-то пошло не так...")
     )
     await application.bot.send_message(chat_id=CHAT_ID, text=message)
