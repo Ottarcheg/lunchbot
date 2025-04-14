@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.base import JobLookupError
 from telegram.ext import (
     ApplicationBuilder, MessageHandler, filters, ContextTypes
 )
@@ -106,16 +105,20 @@ def home():
 
 async def main():
     logging.info("🚀 Инициализация Telegram Application...")
-    logging.info(f"🕒 Время сервера (UTC): {datetime.utcnow()}")
+    logging.info(f"🕒 Время сервера (UTC): {datetime.now(timezone('UTC'))}")
     logging.info(f"🕒 Время Кипра: {datetime.now(CYPRUS_TZ)}")
 
     application = ApplicationBuilder().token(TOKEN).build()
     await application.bot.delete_webhook(drop_pending_updates=True)
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
 
+    # Получаем текущий event loop
+    loop = asyncio.get_running_loop()
+
+    # Планирование задач
     logging.info("📅 Планирую задачи...")
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), "cron", hour=16, minute=0)
-    scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
+    scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=16, minute=10)
+    scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=19, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
 
