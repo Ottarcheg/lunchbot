@@ -7,10 +7,7 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask
-import nest_asyncio
 import threading
-
-nest_asyncio.apply()
 
 BOT_TOKEN = "7701441306:AAF5Dd4VcXSilKIw9mAfPMmWQrzvAiWB69I"
 CHAT_ID = 344657888
@@ -59,10 +56,10 @@ async def send_weekly_summary(application: Application):
         6: "Ты просто лучший, почти всю неделю обедал!",
         7: "Амбиливбл! Вин стрик!",
     }
-    message = (
-        "📊 Обеденная статистика за неделю:\n" +
-        messages.get(count, "Что-то пошло не так...")
-    )
+message = (
+    "📊 Обеденная статистика за неделю:\n" +
+    messages.get(count, "Что-то пошло не так...")
+)
     await application.bot.send_message(chat_id=CHAT_ID, text=message)
     save_data({})
 
@@ -75,18 +72,21 @@ async def main():
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=CHAT_ID), handle_message))
 
-    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=12, minute=50, timezone="Europe/Nicosia"))
+    scheduler.add_job(lambda: asyncio.create_task(ask_lunch(application)), CronTrigger(hour=13, minute=0, timezone="Europe/Nicosia"))
     scheduler.add_job(lambda: asyncio.create_task(send_weekly_summary(application)), CronTrigger(day_of_week="sun", hour=19, minute=0, timezone="Europe/Nicosia"))
     scheduler.start()
 
     logging.info("✅ LunchBot готов. Старт polling...")
-    await application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    logging.info("📡 Polling запущен")
 
 def run_flask():
     app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.start()
-
-    asyncio.run(main())
+    threading.Thread(target=run_flask).start()
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    loop.run_forever()
