@@ -71,7 +71,8 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                 "Овощи": 0,
                 "Фрукты": 0,
                 "Жиры": 0,
-                "Молоко": 0
+                "Молоко": 0,
+                "Сладкое": 0
             }
         }
 
@@ -157,7 +158,15 @@ async def main():
     await application.bot.delete_webhook(drop_pending_updates=True)
     from telegram.ext import filters
 
-    application.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_response))
+    # Хендлер для ответов в ЛИЧКУ (Да / Нет)
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_response)
+    )
+
+    # Хендлер для КАТЕГОРИЙ из ГРУППЫ
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Chat(chat_id=-1002331382512), handle_response)
+    )
 
     # === Хендлер для канала ===
     application.add_handler(
@@ -171,7 +180,7 @@ async def main():
     logging.info("📅 Планирую задачи...")
     scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=19, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
-    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=16, minute=50)
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=17, minute=45)
     scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
@@ -182,6 +191,8 @@ async def main():
 async def send_daily_table(application):
     logging.info("📋 Отправка таблицы питания в группу...")
     table = (
+        "🍽 План питания на сегодня:\n\n"
+        "```\n"
         "| Категория | План | Факт |\n"
         "|-----------|------|------|\n"
         "| Злаки     | 7    |      |\n"
@@ -189,10 +200,12 @@ async def send_daily_table(application):
         "| Овощи     | 3    |      |\n"
         "| Фрукты    | 4    |      |\n"
         "| Жиры      | 4    |      |\n"
-        "| Молоко    | 1    |      |"
+        "| Молоко    | 1    |      |\n"
+        "| Сладкое   | 200  |      |\n"
+        "```"
     )
     try:
-        await application.bot.send_message(chat_id=CHAT_ID, text=f"🍽 План питания на сегодня:\n\n{table}")
+        await application.bot.send_message(chat_id=-1002331382512, text=table, parse_mode="Markdown")
         logging.info("📤 Таблица отправлена.")
     except Exception as e:
         logging.exception("Ошибка при отправке таблицы.")
@@ -202,7 +215,7 @@ async def send_nutrition_summary(application):
     data = load_data()
     today = datetime.now(CYPRUS_TZ).strftime('%Y-%m-%d')
     norms = {
-        "Злаки": 7, "Белок": 6, "Овощи": 3, "Фрукты": 4, "Жиры": 4, "Молоко": 1
+        "Злаки": 7, "Белок": 6, "Овощи": 3, "Фрукты": 4, "Жиры": 4, "Молоко": 1, "Сладкое": 200
     }
 
     if today not in data or "Группировка" not in data[today]:
@@ -210,16 +223,27 @@ async def send_nutrition_summary(application):
         return
 
     actuals = data[today]["Группировка"]
-    summary_lines = ["📊 Сравнение рациона за день:"]
+    summary_lines = [
+        "| Категория | План | Факт | Δ    |",
+        "|-----------|------|------|------|"
+    ]
+
     for cat, plan in norms.items():
         fact = actuals.get(cat, 0)
         diff = round(fact - plan, 1)
-        status = "✅" if diff == 0 else ("⬆️" if diff > 0 else "⬇️")
-        summary_lines.append(f"{cat}: план {plan}, факт {fact} ({status} {diff})")
+        symbol = "✅" if diff == 0 else ("⬆️" if diff > 0 else "⬇️")
+        summary_lines.append(
+            f"| {cat:<9} | {plan:<4} | {fact:<4} | {symbol} {abs(diff):<3} |"
+        )
 
-    message = "\n".join(summary_lines)
+    message = "📊 Сравнение рациона за день:\n\n```\n" + "\n".join(summary_lines) + "\n```"
+
     try:
-        await application.bot.send_message(chat_id=CHAT_ID, text=message)
+        await application.bot.send_message(
+            chat_id=-1002331382512,
+            text=message,
+            parse_mode="Markdown"
+        )
         logging.info("📤 Дневная статистика отправлена.")
     except Exception as e:
         logging.exception("Ошибка при отправке дневной статистики.")
