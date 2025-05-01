@@ -103,6 +103,26 @@ def home():
     logging.info("🌍 Получен HTTP GET запрос на /")
     return "LunchBot is running"
 
+from telegram import Update
+from telegram.ext import ContextTypes
+from datetime import timedelta
+
+async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if "завтрак" in update.message.text.lower():
+        logging.info("🍳 Обнаружено сообщение с 'завтрак' в канале.")
+
+        async def remind(delay_minutes, note):
+            await asyncio.sleep(delay_minutes * 60)
+            try:
+                await context.bot.send_message(chat_id=CHAT_ID, text=f"⏰ Напоминание ({note} после завтрака): пора поесть!")
+                logging.info(f"🔔 Напоминание '{note}' отправлено.")
+            except Exception as e:
+                logging.exception(f"Ошибка при отправке напоминания '{note}': {e}")
+
+        asyncio.create_task(remind(270, "4ч30м"))
+        asyncio.create_task(remind(290, "4ч50м"))
+        asyncio.create_task(remind(300, "5ч"))
+
 async def main():
     logging.info("🚀 Инициализация Telegram Application...")
     logging.info(f"🕒 Время сервера (UTC): {datetime.now(timezone('UTC'))}")
@@ -111,6 +131,11 @@ async def main():
     application = ApplicationBuilder().token(TOKEN).build()
     await application.bot.delete_webhook(drop_pending_updates=True)
     application.add_handler(MessageHandler(filters.TEXT, handle_response))
+
+    # === Хендлер для канала ===
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_message)
+    )
 
     # Получаем текущий event loop
     loop = asyncio.get_running_loop()
