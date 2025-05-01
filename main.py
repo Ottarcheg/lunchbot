@@ -114,6 +114,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         logging.info(f"💾 Сохранённый table_message_id: {message_id}")
                         logging.info(f"🛠 Пытаюсь отредактировать сообщение {message_id} в чате -1002331382512")
+                        logging.info(f"📌 Текст, который будет отправлен:\n{table_text}")
                         await context.bot.edit_message_text(
                             chat_id=-1002331382512,
                             message_id=message_id,
@@ -217,6 +218,10 @@ async def main():
     logging.info("✅ Планировщик запущен")
     
     logging.info("📡 LunchBot готов. Старт polling...")
+    
+    data = load_data()
+    logging.info(f"📄 lunch_data.json: {json.dumps(data, indent=2, ensure_ascii=False)}")
+
     await application.run_polling()
     
 from datetime import datetime
