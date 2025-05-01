@@ -80,7 +80,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
     if user_response.lower() in ["да", "нет"]:
         data[today]["Ответы"].append(user_response.lower())
         save_data(data)
-        await update.message.reply_text("Ответ сохранён ✅")
+      # await update.message.reply_text("Ответ сохранён ✅")
         logging.info(f"✅ Ответ '{user_response}' сохранён.")
         return
 
@@ -92,7 +92,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
             if category in data[today]["Группировка"]:
                 data[today]["Группировка"][category] += value
                 save_data(data)
-                await update.message.reply_text(f"{category} обновлено на +{value} ✅")
+              # await update.message.reply_text(f"{category} обновлено на +{value} ✅")
                 logging.info(f"📊 {category} увеличено на {value}.")
 
                 # Обновление таблицы в группе, если есть message_id
@@ -127,7 +127,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
             logging.exception("Ошибка при обработке категории")
 
     # Если не распознано
-    await update.message.reply_text("Пожалуйста, отправь 'Да', 'Нет' или 'Категория - X'.")
+  # await update.message.reply_text("Пожалуйста, отправь 'Да', 'Нет' или 'Категория - X'.")
     logging.info("⚠️ Неверный формат сообщения.")
 
 async def send_weekly_summary(application):
@@ -211,7 +211,7 @@ async def main():
     logging.info("📅 Планирую задачи...")
     scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=19, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
-    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=18, minute=15)
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=7, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
