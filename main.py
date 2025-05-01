@@ -108,20 +108,21 @@ from telegram.ext import ContextTypes
 from datetime import timedelta
 
 async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if "завтрак" in update.message.text.lower():
-        logging.info("🍳 Обнаружено сообщение с 'завтрак' в канале.")
+    logging.info("📥 Обнаружено сообщение в группе или канале.")
+    if update.message and "завтрак" in update.message.text.lower():
+        logging.info("🍳 Обнаружено сообщение с 'завтрак'.")
 
         async def remind(delay_minutes, note):
             await asyncio.sleep(delay_minutes * 60)
             try:
-                await context.bot.send_message(chat_id=CHAT_ID, text=f"⏰ Напоминание ({note} после завтрака): пора поесть!")
+                await context.bot.send_message(chat_id=CHAT_ID, text=f"⏰ Прошло уже {note} после завтрака. Скоро обед!")
                 logging.info(f"🔔 Напоминание '{note}' отправлено.")
             except Exception as e:
                 logging.exception(f"Ошибка при отправке напоминания '{note}': {e}")
 
-        asyncio.create_task(remind(270, "4ч30м"))
-        asyncio.create_task(remind(290, "4ч50м"))
-        asyncio.create_task(remind(300, "5ч"))
+        asyncio.create_task(remind(270, "4ч30м"))  # 4 ч 30 мин
+        asyncio.create_task(remind(290, "4ч50м"))  # 4 ч 50 мин
+        asyncio.create_task(remind(300, "5ч"))     # 5 ч
 
 async def main():
     logging.info("🚀 Инициализация Telegram Application...")
@@ -134,7 +135,7 @@ async def main():
 
     # === Хендлер для канала ===
     application.add_handler(
-        MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_message)
+        MessageHandler(filters.TEXT & (filters.ChatType.CHANNEL | filters.ChatType.GROUP | filters.ChatType.SUPERGROUP), handle_channel_message)
     )
 
     # Получаем текущий event loop
