@@ -131,7 +131,9 @@ async def main():
 
     application = ApplicationBuilder().token(TOKEN).build()
     await application.bot.delete_webhook(drop_pending_updates=True)
-    application.add_handler(MessageHandler(filters.TEXT, handle_response))
+    from telegram.ext import filters
+
+    application.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_response))
 
     # === Хендлер для канала ===
     application.add_handler(
