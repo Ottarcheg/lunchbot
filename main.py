@@ -84,48 +84,47 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
         logging.info(f"✅ Ответ '{user_response}' сохранён.")
         return
 
-    # Обработка записи по питанию (например, "Злаки - 2")
-    if " - " in user_response:
-        try:
-            category, value = map(str.strip, user_response.split(" - "))
-            value = float(value)
-            if category in data[today]["Группировка"]:
-                data[today]["Группировка"][category] += value
-                save_data(data)
-                await update.message.reply_text(f"{category} обновлено на +{value} ✅")
-                logging.info(f"📊 {category} увеличено на {value}.")
+# Обработка записи по питанию (например, "Злаки - 2")
+if " - " in user_response:
+    try:
+        category, value = map(str.strip, user_response.split(" - "))
+        value = float(value)
+        if category in data[today]["Группировка"]:
+            data[today]["Группировка"][category] += value
+            save_data(data)
+            await update.message.reply_text(f"{category} обновлено на +{value} ✅")
+            logging.info(f"📊 {category} увеличено на {value}.")
 
-                # Обновление таблицы в группе, если есть message_id
-                message_id = data[today].get("table_message_id")
-                if message_id:
-                    actuals = data[today]["Группировка"]
-                    table_text = (
-                        "🍽 План питания на сегодня:\n\n"
-                        "```\n"
-                        "| Категория | План | Факт |\n"
-                        "|-----------|------|------|\n"
-                        f"| Злаки     | 7    | {actuals['Злаки']} |\n"
-                        f"| Белок     | 6    | {actuals['Белок']} |\n"
-                        f"| Овощи     | 3    | {actuals['Овощи']} |\n"
-                        f"| Фрукты    | 4    | {actuals['Фрукты']} |\n"
-                        f"| Жиры      | 4    | {actuals['Жиры']} |\n"
-                        f"| Молоко    | 1    | {actuals['Молоко']} |\n"
-                        f"| Сладкое   | 200  | {actuals['Сладкое']} |\n"
-                        "```"
+            # Обновление таблицы в группе, если есть message_id
+            message_id = data[today].get("table_message_id")
+            if message_id:
+                actuals = data[today]["Группировка"]
+                table_text = (
+                    "🍽 План питания на сегодня:\n\n"
+                    "| Категория | План | Факт |\n"
+                    "|-----------|------|------|\n"
+                    f"| Злаки     | 7    | {actuals['Злаки']} |\n"
+                    f"| Белок     | 6    | {actuals['Белок']} |\n"
+                    f"| Овощи     | 3    | {actuals['Овощи']} |\n"
+                    f"| Фрукты    | 4    | {actuals['Фрукты']} |\n"
+                    f"| Жиры      | 4    | {actuals['Жиры']} |\n"
+                    f"| Молоко    | 1    | {actuals['Молоко']} |\n"
+                    f"| Сладкое   | 200  | {actuals['Сладкое']} |\n"
+                )
+                try:
+                    logging.info(f"🛠 Пытаюсь обновить сообщение {message_id} в чате -1002331382512")
+                    await context.bot.edit_message_text(
+                        chat_id=-1002331382512,
+                        message_id=message_id,
+                        text=table_text,
+                        parse_mode=None  # Временно без Markdown
                     )
-                    try:
-                        await context.bot.edit_message_text(
-                            chat_id=-1002331382512,
-                            message_id=message_id,
-                            text=table_text,
-                            parse_mode="Markdown"
-                        )
-                        logging.info("🔄 Таблица обновлена в группе.")
-                    except Exception as e:
-                        logging.exception("Ошибка при обновлении таблицы в чате.")
-                return
-        except Exception as e:
-            logging.exception("Ошибка при обработке категории")
+                    logging.info("🔄 Таблица обновлена в группе.")
+                except Exception as e:
+                    logging.exception(f"Ошибка при обновлении таблицы в чате: {e}")
+            return
+    except Exception as e:
+        logging.exception("Ошибка при обработке категории")
 
     # Если не распознано
     await update.message.reply_text("Пожалуйста, отправь 'Да', 'Нет' или 'Категория - X'.")
@@ -212,7 +211,7 @@ async def main():
     logging.info("📅 Планирую задачи...")
     scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=19, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
-    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=7, minute=0)
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=18, minute=10)
     scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
