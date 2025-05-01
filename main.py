@@ -223,7 +223,7 @@ async def main():
     logging.info("📅 Планирую задачи...")
     scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=19, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
-    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=19, minute=10)
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=8, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
