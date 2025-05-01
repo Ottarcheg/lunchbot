@@ -112,7 +112,8 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                         "```"
                     )
                     try:
-                        logging.info(f"🛠 Пытаюсь обновить сообщение {message_id} в чате -1002331382512")
+                        logging.info(f"💾 Сохранённый table_message_id: {message_id}")
+                        logging.info(f"🛠 Пытаюсь отредактировать сообщение {message_id} в чате -1002331382512")
                         await context.bot.edit_message_text(
                             chat_id=-1002331382512,
                             message_id=message_id,
