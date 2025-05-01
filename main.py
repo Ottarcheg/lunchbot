@@ -76,6 +76,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
             }
         }
 
+    # Обработка ответа Да / Нет
     if user_response.lower() in ["да", "нет"]:
         data[today]["Ответы"].append(user_response.lower())
         save_data(data)
@@ -83,6 +84,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
         logging.info(f"✅ Ответ '{user_response}' сохранён.")
         return
 
+    # Обработка записи по питанию (например, "Злаки - 2")
     if " - " in user_response:
         try:
             category, value = map(str.strip, user_response.split(" - "))
@@ -92,10 +94,40 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                 save_data(data)
                 await update.message.reply_text(f"{category} обновлено на +{value} ✅")
                 logging.info(f"📊 {category} увеличено на {value}.")
+
+                # Обновление таблицы в группе, если есть message_id
+                message_id = data[today].get("table_message_id")
+                if message_id:
+                    actuals = data[today]["Группировка"]
+                    table_text = (
+                        "🍽 План питания на сегодня:\n\n"
+                        "```\n"
+                        "| Категория | План | Факт |\n"
+                        "|-----------|------|------|\n"
+                        f"| Злаки     | 7    | {actuals['Злаки']} |\n"
+                        f"| Белок     | 6    | {actuals['Белок']} |\n"
+                        f"| Овощи     | 3    | {actuals['Овощи']} |\n"
+                        f"| Фрукты    | 4    | {actuals['Фрукты']} |\n"
+                        f"| Жиры      | 4    | {actuals['Жиры']} |\n"
+                        f"| Молоко    | 1    | {actuals['Молоко']} |\n"
+                        f"| Сладкое   | 200  | {actuals['Сладкое']} |\n"
+                        "```"
+                    )
+                    try:
+                        await context.bot.edit_message_text(
+                            chat_id=-1002331382512,
+                            message_id=message_id,
+                            text=table_text,
+                            parse_mode="Markdown"
+                        )
+                        logging.info("🔄 Таблица обновлена в группе.")
+                    except Exception as e:
+                        logging.exception("Ошибка при обновлении таблицы в чате.")
                 return
         except Exception as e:
             logging.exception("Ошибка при обработке категории")
 
+    # Если не распознано
     await update.message.reply_text("Пожалуйста, отправь 'Да', 'Нет' или 'Категория - X'.")
     logging.info("⚠️ Неверный формат сообщения.")
 
@@ -180,7 +212,7 @@ async def main():
     logging.info("📅 Планирую задачи...")
     scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=19, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
-    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=17, minute=45)
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=7, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
@@ -188,8 +220,13 @@ async def main():
     logging.info("📡 LunchBot готов. Старт polling...")
     await application.run_polling()
     
+from datetime import datetime
+
 async def send_daily_table(application):
     logging.info("📋 Отправка таблицы питания в группу...")
+    today = datetime.now(CYPRUS_TZ).strftime('%Y-%m-%d')
+    data = load_data()
+
     table = (
         "🍽 План питания на сегодня:\n\n"
         "```\n"
@@ -204,11 +241,35 @@ async def send_daily_table(application):
         "| Сладкое   | 200  |      |\n"
         "```"
     )
+
     try:
-        await application.bot.send_message(chat_id=-1002331382512, text=table, parse_mode="Markdown")
+        msg = await application.bot.send_message(
+            chat_id=-1002331382512,
+            text=table,
+            parse_mode="Markdown"
+        )
         logging.info("📤 Таблица отправлена.")
+        if today not in data:
+            data[today] = {
+                "Ответы": [],
+                "Группировка": {
+                    "Злаки": 0,
+                    "Белок": 0,
+                    "Овощи": 0,
+                    "Фрукты": 0,
+                    "Жиры": 0,
+                    "Молоко": 0,
+                    "Сладкое": 0
+                }
+            }
+        data[today]["table_message_id"] = msg.message_id
+        save_data(data)
     except Exception as e:
         logging.exception("Ошибка при отправке таблицы.")
+    
+    msg = await application.bot.send_message(...)
+    data[today]["table_message_id"] = msg.message_id
+    save_data(data)
         
 async def send_nutrition_summary(application):
     logging.info("📊 Генерация дневной статистики питания...")
