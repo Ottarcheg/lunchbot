@@ -80,7 +80,6 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
     if user_response.lower() in ["да", "нет"]:
         data[today]["Ответы"].append(user_response.lower())
         save_data(data)
-      # await update.message.reply_text("Ответ сохранён ✅")
         logging.info(f"✅ Ответ '{user_response}' сохранён.")
         return
 
@@ -92,7 +91,6 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
             if category in data[today]["Группировка"]:
                 data[today]["Группировка"][category] += value
                 save_data(data)
-              # await update.message.reply_text(f"{category} обновлено на +{value} ✅")
                 logging.info(f"📊 {category} увеличено на {value}.")
 
                 # Обновление таблицы в группе, если есть message_id
@@ -101,6 +99,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                     actuals = data[today]["Группировка"]
                     table_text = (
                         "🍽 План питания на сегодня:\n\n"
+                        "```\n"
                         "| Категория | План | Факт |\n"
                         "|-----------|------|------|\n"
                         f"| Злаки     | 7    | {actuals['Злаки']} |\n"
@@ -110,6 +109,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                         f"| Жиры      | 4    | {actuals['Жиры']} |\n"
                         f"| Молоко    | 1    | {actuals['Молоко']} |\n"
                         f"| Сладкое   | 200  | {actuals['Сладкое']} |\n"
+                        "```"
                     )
                     try:
                         logging.info(f"🛠 Пытаюсь обновить сообщение {message_id} в чате -1002331382512")
@@ -117,7 +117,7 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
                             chat_id=-1002331382512,
                             message_id=message_id,
                             text=table_text,
-                            parse_mode=None
+                            parse_mode="Markdown"
                         )
                         logging.info("🔄 Таблица обновлена в группе.")
                     except Exception as e:
@@ -127,7 +127,6 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
             logging.exception("Ошибка при обработке категории")
 
     # Если не распознано
-  # await update.message.reply_text("Пожалуйста, отправь 'Да', 'Нет' или 'Категория - X'.")
     logging.info("⚠️ Неверный формат сообщения.")
 
 async def send_weekly_summary(application):
@@ -265,10 +264,6 @@ async def send_daily_table(application):
         save_data(data)
     except Exception as e:
         logging.exception("Ошибка при отправке таблицы.")
-    
-    msg = await application.bot.send_message(...)
-    data[today]["table_message_id"] = msg.message_id
-    save_data(data)
         
 async def send_nutrition_summary(application):
     logging.info("📊 Генерация дневной статистики питания...")
