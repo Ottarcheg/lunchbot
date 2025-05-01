@@ -58,21 +58,45 @@ async def ask_lunch(application):
 
 async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("📩 Получен ответ от пользователя.")
-    user_response = update.message.text.lower()
+    user_response = update.message.text.strip()
     data = load_data()
     today = datetime.now(CYPRUS_TZ).strftime('%Y-%m-%d')
 
     if today not in data:
-        data[today] = []
+        data[today] = {
+            "Ответы": [],
+            "Группировка": {
+                "Злаки": 0,
+                "Белок": 0,
+                "Овощи": 0,
+                "Фрукты": 0,
+                "Жиры": 0,
+                "Молоко": 0
+            }
+        }
 
-    if user_response in ["да", "нет"]:
-        data[today].append(user_response)
+    if user_response.lower() in ["да", "нет"]:
+        data[today]["Ответы"].append(user_response.lower())
         save_data(data)
         await update.message.reply_text("Ответ сохранён ✅")
         logging.info(f"✅ Ответ '{user_response}' сохранён.")
-    else:
-        await update.message.reply_text("Пожалуйста, ответь 'Да' или 'Нет'.")
-        logging.info("⚠️ Неверный ответ от пользователя.")
+        return
+
+    if " - " in user_response:
+        try:
+            category, value = map(str.strip, user_response.split(" - "))
+            value = float(value)
+            if category in data[today]["Группировка"]:
+                data[today]["Группировка"][category] += value
+                save_data(data)
+                await update.message.reply_text(f"{category} обновлено на +{value} ✅")
+                logging.info(f"📊 {category} увеличено на {value}.")
+                return
+        except Exception as e:
+            logging.exception("Ошибка при обработке категории")
+
+    await update.message.reply_text("Пожалуйста, отправь 'Да', 'Нет' или 'Категория - X'.")
+    logging.info("⚠️ Неверный формат сообщения.")
 
 async def send_weekly_summary(application):
     logging.info("📊 Генерация еженедельной статистики...")
@@ -149,9 +173,57 @@ async def main():
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
+    
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=7, minute=0)
+    scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
 
     logging.info("📡 LunchBot готов. Старт polling...")
     await application.run_polling()
+    
+async def send_daily_table(application):
+    logging.info("📋 Отправка таблицы питания в группу...")
+    table = (
+        "| Категория | План | Факт |\n"
+        "|-----------|------|------|\n"
+        "| Злаки     | 7    |      |\n"
+        "| Белок     | 6    |      |\n"
+        "| Овощи     | 3    |      |\n"
+        "| Фрукты    | 4    |      |\n"
+        "| Жиры      | 4    |      |\n"
+        "| Молоко    | 1    |      |"
+    )
+    try:
+        await application.bot.send_message(chat_id=CHAT_ID, text=f"🍽 План питания на сегодня:\n\n{table}")
+        logging.info("📤 Таблица отправлена.")
+    except Exception as e:
+        logging.exception("Ошибка при отправке таблицы.")
+        
+async def send_nutrition_summary(application):
+    logging.info("📊 Генерация дневной статистики питания...")
+    data = load_data()
+    today = datetime.now(CYPRUS_TZ).strftime('%Y-%m-%d')
+    norms = {
+        "Злаки": 7, "Белок": 6, "Овощи": 3, "Фрукты": 4, "Жиры": 4, "Молоко": 1
+    }
+
+    if today not in data or "Группировка" not in data[today]:
+        logging.warning("⚠️ Нет данных для сравнения.")
+        return
+
+    actuals = data[today]["Группировка"]
+    summary_lines = ["📊 Сравнение рациона за день:"]
+    for cat, plan in norms.items():
+        fact = actuals.get(cat, 0)
+        diff = round(fact - plan, 1)
+        status = "✅" if diff == 0 else ("⬆️" if diff > 0 else "⬇️")
+        summary_lines.append(f"{cat}: план {plan}, факт {fact} ({status} {diff})")
+
+    message = "\n".join(summary_lines)
+    try:
+        await application.bot.send_message(chat_id=CHAT_ID, text=message)
+        logging.info("📤 Дневная статистика отправлена.")
+    except Exception as e:
+        logging.exception("Ошибка при отправке дневной статистики.")
 
 if __name__ == "__main__":
     import nest_asyncio
