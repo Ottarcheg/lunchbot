@@ -85,6 +85,23 @@ async def handle_response(update, context: ContextTypes.DEFAULT_TYPE):
             }
         }
 
+    # ⏰ Реакция на слово "завтрак"
+    if "завтрак" in user_response.lower():
+        logging.info("🍳 Обнаружено слово 'завтрак' в handle_response.")
+
+        async def remind(delay_minutes, note):
+            await asyncio.sleep(delay_minutes * 60)
+            try:
+                await context.bot.send_message(chat_id=CHAT_ID, text=f"⏰ Прошло уже {note} после завтрака. Скоро обед!")
+                logging.info(f"🔔 Напоминание '{note}' отправлено.")
+            except Exception as e:
+                logging.exception(f"Ошибка при отправке напоминания '{note}': {e}")
+
+        asyncio.create_task(remind(270, "4ч30м"))
+        asyncio.create_task(remind(290, "4ч50м"))
+        asyncio.create_task(remind(300, "5ч"))
+        return
+
     # Обработка "Да"/"Нет"
     if user_response.lower() in ["да", "нет"]:
         data[today]["Ответы"].append(user_response.lower())
@@ -223,7 +240,7 @@ async def main():
     logging.info("📅 Планирую задачи...")
     scheduler.add_job(lambda: loop.create_task(ask_lunch(application)), "cron", hour=19, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_weekly_summary(application)), "cron", day_of_week="sun", hour=22, minute=0)
-    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=8, minute=0)
+    scheduler.add_job(lambda: loop.create_task(send_daily_table(application)), "cron", hour=7, minute=0)
     scheduler.add_job(lambda: loop.create_task(send_nutrition_summary(application)), "cron", hour=0, minute=0)
     scheduler.start()
     logging.info("✅ Планировщик запущен")
@@ -285,9 +302,17 @@ async def send_daily_table(application):
 async def send_nutrition_summary(application):
     logging.info("📊 Генерация дневной статистики питания...")
     data = load_data()
-    today = datetime.now(CYPRUS_TZ).strftime('%Y-%m-%d')
+    today = (datetime.now(CYPRUS_TZ) - timedelta(days=1)).strftime('%Y-%m-%d')
+    logging.info(f"📅 Используется дата для статистики: {today}")
+
     norms = {
-        "Злаки": 7, "Белок": 6, "Овощи": 3, "Фрукты": 4, "Жиры": 4, "Молоко": 1, "Сладкое": 200
+        "Злаки": 7,
+        "Белок": 6,
+        "Овощи": 3,
+        "Фрукты": 4,
+        "Жиры": 4,
+        "Молоко": 1,
+        "Сладкое": 200
     }
 
     if today not in data or "Группировка" not in data[today]:
@@ -295,6 +320,9 @@ async def send_nutrition_summary(application):
         return
 
     actuals = data[today]["Группировка"]
+    logging.info(f"📊 Плановые значения: {norms}")
+    logging.info(f"📊 Фактические значения: {actuals}")
+
     summary_lines = [
         "| Категория | План | Факт | Δ    |",
         "|-----------|------|------|------|"
