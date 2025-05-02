@@ -194,20 +194,35 @@ from datetime import timedelta
 
 async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("📥 Обнаружено сообщение в группе или канале.")
-    if update.message and "завтрак" in update.message.text.lower():
-        logging.info("🍳 Обнаружено сообщение с 'завтрак'.")
 
-        async def remind(delay_minutes, note):
-            await asyncio.sleep(delay_minutes * 60)
-            try:
-                await context.bot.send_message(chat_id=CHAT_ID, text=f"⏰ Прошло уже {note} после завтрака. Скоро обед!")
-                logging.info(f"🔔 Напоминание '{note}' отправлено.")
-            except Exception as e:
-                logging.exception(f"Ошибка при отправке напоминания '{note}': {e}")
+    if not update.message or not update.message.text:
+        logging.warning("⚠️ Обновление не содержит текстового сообщения.")
+        return
 
-        asyncio.create_task(remind(270, "4ч30м"))  # 4 ч 30 мин
-        asyncio.create_task(remind(290, "4ч50м"))  # 4 ч 50 мин
-        asyncio.create_task(remind(300, "5ч"))     # 5 ч
+    message_text = update.message.text.lower()
+
+    async def remind(delay_minutes, note, meal):
+        await asyncio.sleep(delay_minutes * 60)
+        try:
+            await context.bot.send_message(
+                chat_id=CHAT_ID,
+                text=f"⏰ Прошло уже {note} после {meal}. Не забудь попитаться!"
+            )
+            logging.info(f"🔔 Напоминание '{note}' после {meal} отправлено.")
+        except Exception as e:
+            logging.exception(f"Ошибка при отправке напоминания '{note}' после {meal}: {e}")
+
+    if "завтрак" in message_text:
+        logging.info("🍳 Обнаружено сообщение с 'завтрак'. Запланированы напоминания про обед.")
+        asyncio.create_task(remind(270, "4ч30м", "завтрака"))  # 4 ч 30 мин
+        asyncio.create_task(remind(290, "4ч50м", "завтрака"))  # 4 ч 50 мин
+        asyncio.create_task(remind(300, "5ч", "завтрака"))     # 5 ч
+
+    elif "обед" in message_text:
+        logging.info("🍲 Обнаружено сообщение с 'обед'. Запланированы напоминания про ужин.")
+        asyncio.create_task(remind(270, "4ч30м", "обеда"))
+        asyncio.create_task(remind(290, "4ч50м", "обеда"))
+        asyncio.create_task(remind(300, "5ч", "обеда"))
 
 async def main():
     logging.info("🚀 Инициализация Telegram Application...")
