@@ -346,7 +346,7 @@ async def send_nutrition_summary(application):
     for cat, plan in norms.items():
         fact = actuals.get(cat, 0)
         diff = round(fact - plan, 1)
-        symbol = "✅" if diff == 0 else ("⬆️" if diff > 0 else "⬇️")
+        symbol = "✅" if diff == 0 else ("📈" if diff > 0 else "📉")
         summary_lines.append(
             f"| {cat:<9} | {plan:<4} | {fact:<4} | {symbol} {abs(diff):<3} |"
         )
