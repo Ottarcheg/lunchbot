@@ -365,6 +365,14 @@ async def send_nutrition_summary(application):
 
 if __name__ == "__main__":
     import nest_asyncio
+    import asyncio
+
     nest_asyncio.apply()
-    logging.info("🔁 Запуск LunchBot через asyncio.run...")
-    asyncio.run(main())
+    logging.info("🔁 Запуск LunchBot в асинхронной среде...")
+
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(main())
+        loop.run_forever()
+    except Exception as e:
+        logging.exception(f"❌ Ошибка при запуске: {e}")
